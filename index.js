@@ -1,13 +1,15 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+require('dotenv').config()
 const app = express();
 const port = process.env.PORT || 5000;
 
 // middleware 
 app.use(cors());
 app.use(express.json());
-require('dotenv').config()
+
 
 // const uri = "mongodb+srv://carDoctor:cx53SkLiKy1iVX0J@cluster0.gvng5am.mongodb.net/?retryWrites=true&w=majority";
 
