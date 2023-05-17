@@ -10,11 +10,11 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-
+// console.log(process.env.DB_USER);
 // const uri = "mongodb+srv://carDoctor:cx53SkLiKy1iVX0J@cluster0.gvng5am.mongodb.net/?retryWrites=true&w=majority";
 
 
-var uri = "mongodb://carDoctor:cx53SkLiKy1iVX0J@ac-eg0vsya-shard-00-00.gvng5am.mongodb.net:27017,ac-eg0vsya-shard-00-01.gvng5am.mongodb.net:27017,ac-eg0vsya-shard-00-02.gvng5am.mongodb.net:27017/?ssl=true&replicaSet=atlas-bv7dpn-shard-0&authSource=admin&retryWrites=true&w=majority";
+var uri = `mongodb://${process.env.DB_USER}:${process.env.DB_PASS}@ac-eg0vsya-shard-00-00.gvng5am.mongodb.net:27017,ac-eg0vsya-shard-00-01.gvng5am.mongodb.net:27017,ac-eg0vsya-shard-00-02.gvng5am.mongodb.net:27017/?ssl=true&replicaSet=atlas-bv7dpn-shard-0&authSource=admin&retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -25,13 +25,40 @@ const client = new MongoClient(uri, {
     }
 });
 
+const verifyJWT = (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        return res.status(401).send({ error: true, message: "Unauthorized access" })
+    }
+    // from client token 
+    const token = authorization.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+        if (error) {
+            return res.status(403).send({ error: true, message: "Unauthorized access" })
+        }
+        req.decoded = decoded;
+        next();
+    })
+}
+
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
 
         const servicesCollection = client.db("carDoctorDb").collection("services");
         const bookingsCollection = client.db("carDoctorDb").collection("bookings");
+
+        // jwt  
+        app.post('/jwt', (req, res) => {
+            const user = req.body;
+            console.log("user from /jwt", user);
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+            console.log("token created:", token);
+            res.send({ token });
+        })
+
+        // services 
         app.get('/services', async (req, res) => {
             const cursor = servicesCollection.find();
             const result = await cursor.toArray();
@@ -50,8 +77,12 @@ async function run() {
 
         // booking 
 
-        app.get('/bookings', async (req, res) => {
-            // console.log(req.query.email);
+        app.get('/bookings', verifyJWT, async (req, res) => {
+            //  console.log(req.headers.authorization);;
+            decoded = req.decoded;
+            if (decoded.email !== req.query.email) {
+                return res.status(403).send({ error: true, message: "forbidden access" })
+            }
             let query = {};
             if (req.query?.email) {
                 query = {
